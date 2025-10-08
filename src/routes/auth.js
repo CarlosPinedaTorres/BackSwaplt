@@ -89,7 +89,7 @@ if(existingToken){
 
 });
 
-router.post("refresh",async(req,res)=>{
+router.post("/refresh",async(req,res)=>{
   const {refreshToken}=req.body;
   if(!refreshToken) return res.status(400)-json({error:"Refresh Token requerido"});
 
