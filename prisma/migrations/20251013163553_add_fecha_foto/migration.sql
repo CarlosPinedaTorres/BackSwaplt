@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `User` ADD COLUMN `fechaNacimiento` DATETIME(3) NOT NULL DEFAULT '2000-01-01T00:00:00+00:00',
+    ADD COLUMN `fotoPerfil` VARCHAR(191) NULL;

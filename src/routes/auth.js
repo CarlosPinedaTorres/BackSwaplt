@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../prisma.js";
 import  dotenv from "dotenv";
 import { hashPassword,comparePassword } from "../utils/hash.js";
+import { retryPrisma } from "../utils/retryPrisma.js";
 dotenv.config();
 
 
@@ -13,12 +14,12 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET;
 //Registro y login
 
 router.post("/register",async(req,res)=>{
-    const{nombre,apellidos,edad,ciudad,email,password}=req.body;
-    const passwordHasheada=await hashPassword(password) //recordar que entre 10 y 12 suele ser lo comun
+   const { nombre, apellidos, edad, fechaNacimiento, ciudad, email, password, fotoPerfil } = req.body;
+    const passwordHasheada=await hashPassword(password) 
     try{
-        const user=await prisma.user.create({
-            data:{nombre,apellidos,edad,ciudad,email,password:passwordHasheada}
-        });
+        const user=await retryPrisma(()=> prisma.user.create({
+            data:{nombre,apellidos,fechaNacimiento,edad,ciudad,email,password:passwordHasheada,fotoPerfil}
+        }));
         res.json(user);
     }catch(err){
         res.status(500).json({error:err.message})
@@ -30,7 +31,7 @@ router.post("/login", async (req, res) => {
   try{
 
   
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await retryPrisma(()=>prisma.user.findUnique({ where: { email } })) ;
 
   if (!user) return res.status(400).json({ error: "Usuario no encontrado" });
 
@@ -62,7 +63,7 @@ if(existingToken){
     },
   });
 }else{
-    await prisma.refreshToken.create({
+    await retryPrisma(()=>prisma.refreshToken.create({
     data:{
         token:refreshToken,
         userId:user.id,
@@ -70,7 +71,7 @@ if(existingToken){
         expiredAT:new Date(Date.now()+30*24*60*60*1000),
 
     },
-  });
+  }));
 }
 
   res.json({
@@ -94,11 +95,11 @@ router.post("/refresh",async(req,res)=>{
   if(!refreshToken) return res.status(400)-json({error:"Refresh Token requerido"});
 
   try{
-    const storedToken= await prisma.refreshToken.findUnique({
+    const storedToken= await retryPrisma(()=>prisma.refreshToken.findUnique({
       where:{token:refreshToken},
       include:{user:true},
 
-    });
+    }));
     
     if(!storedToken)return res.status(401).json({error:"Refresh token no encontrado en la base de datos"})
     
@@ -124,7 +125,7 @@ router.post("/refresh",async(req,res)=>{
 
       );
 
-         const RefreshToken = jwt.sign(
+         const newRefreshToken = jwt.sign(
       { userId: storedToken.user.id },
       process.env.REFRESH_SECRET,
       { expiresIn: "30d" }
@@ -133,13 +134,14 @@ router.post("/refresh",async(req,res)=>{
  await prisma.refreshToken.update({
       where: { id: storedToken.id },
       data: {
-        token: RefreshToken,
+        token: newRefreshToken,
         expiredAT: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
 
       res.json({
         accessToken,
+        newRefreshToken,
         user:{
           id:storedToken.user.id,
           nombre:storedToken.user.nombre,
@@ -159,16 +161,16 @@ router.post("/refresh",async(req,res)=>{
 router.post("/logout",async(req,res)=>{
   const {refreshToken}=req.body;
 
-  if(!refreshToken)return resizeTo.status(400).json({error:"Refresh token requerido"});
+  if(!refreshToken)return res.status(400).json({error:"Refresh token requerido"});
     try{
-        const storedToken=await prisma.refreshToken.findUnique({
+        const storedToken=await retryPrisma(()=>prisma.refreshToken.findUnique({
           where:{token:refreshToken}
-        })
+        })); 
   if (!storedToken)
         return res.status(404).json({ error: "Token no encontrado" });
-    await prisma.refreshToken.delete({
+    await retryPrisma(()=>prisma.refreshToken.delete({
       where: { id: storedToken.id },
-    });
+    }));
 
     res.json({message:"Sesion cerrada correctamente"})
 
@@ -186,9 +188,9 @@ router.post("/logoutAll", async (req, res) => {
     return res.status(400).json({ error: "ID de usuario requerido" });
 
   try {
-    await prisma.refreshToken.deleteMany({
+    await retryPrisma(()=>prisma.refreshToken.deleteMany({
       where: { userId },
-    });
+    })) ;
 
     res.json({ message: "Sesión cerrada en todos los dispositivos" });
   } catch (err) {

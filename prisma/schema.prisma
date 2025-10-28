@@ -24,19 +24,23 @@ model User{
   id Int @id @default(autoincrement())
   nombre String
   apellidos String
+  fechaNacimiento DateTime 
   edad Int
   ciudad String
   email String @unique
   password String
-  refreshTokens RefreshToken[] //Lista de refresh Tokens para varios dispositivos, movil, web...
+  fotoPerfil String?
+  productos Product[]
+  refreshTokens RefreshToken[] 
   createdAt DateTime @default(now())
-  
-  
+  chatsAsUser1 Chat[] @relation("ChatUser1")
+  chatsAsUser2 Chat[] @relation("ChatUser2")
+  messagesSent Message[] @relation("MessageSender") 
 }
 
 
 //---------------------------------------
-//MODELOS DE REFRESH TOKENS (TERMINAR)
+//MODELOS DE REFRESH TOKENS 
 //---------------------------------------
 
 
@@ -49,4 +53,103 @@ model RefreshToken{
   createdAT DateTime @default(now())
   expiredAT DateTime 
 
+}
+
+
+//---------------------------------------
+//MODELOS DE PRODUCTOS
+//---------------------------------------
+
+
+
+model Product{
+  id Int @id @default(autoincrement())
+  nombre String
+  descripcion String
+  precio Float?
+  fotos Foto[]
+  categoriaId Int
+  categoria Categoria @relation(fields:[categoriaId],references: [id])
+  tipoId Int
+  tipo Tipo @relation(fields: [tipoId],references: [id])
+  estadoId Int
+  estado Estado @relation(fields: [estadoId],references: [id])
+  disponibilidad Boolean @default(true)
+  fechaCreacion DateTime @default(now())
+  fechaActualizacion DateTime @updatedAt
+  userId Int
+  usuario User @relation(fields: [userId],references: [id])
+  ubicacion String?
+  visibilidad Boolean @default(true)
+  chats Chat[] 
+}
+
+model Categoria{
+  id Int   @id @default(autoincrement())
+  nombre String @unique
+  productos Product[]
+}
+
+model Tipo {
+  id       Int        @id @default(autoincrement())
+  nombre   String     @unique 
+  productos Product[]
+}
+
+model Estado {
+  id       Int        @id @default(autoincrement())
+  nombre   String     @unique 
+  productos Product[]
+}
+
+model Foto{
+  id Int @id @default(autoincrement())
+  url String
+  productoId Int
+  producto Product @relation(fields: [productoId], references: [id], onDelete: Cascade)
+}
+
+//---------------------------------------
+//CHATS
+//---------------------------------------
+
+
+model Chat {
+  id        Int  @id @default(autoincrement())
+  user1Id   Int
+  user2Id   Int
+  productId Int
+
+  lastMessageId Int?      @unique 
+  lastMessage   Message? @relation("LastMessageRelation", fields: [lastMessageId], references: [id])
+
+  messages      Message[] @relation("ChatMessages")
+  createdAt DateTime   @default(now())
+
+  updatedAt  DateTime   @updatedAt  
+
+  user1 User @relation("ChatUser1", fields: [user1Id], references: [id])
+  user2 User @relation("ChatUser2", fields: [user2Id], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete:Cascade)
+  @@unique([user1Id, user2Id, productId])
+
+  @@index([user1Id]) 
+  @@index([user2Id]) 
+  @@index([updatedAt]) 
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  chatId    Int
+  senderId  Int
+  content   String
+  createdAt DateTime @default(now())
+
+  chat      Chat     @relation("ChatMessages", fields: [chatId], references: [id] ,onDelete: Cascade)
+  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
+
+  chatAsLastMessage Chat? @relation("LastMessageRelation")
+
+  @@index([chatId]) 
+  @@index([createdAt]) 
 }
