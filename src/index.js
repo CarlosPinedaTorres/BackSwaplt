@@ -8,6 +8,8 @@ import chatsRoutes from "./routes/chats.js";
 import { configureChatSocket } from "./sockets/chatSocket.js";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import paymentsRoutes from "./routes/payments.js";
+
 
 const app = express();
 app.use(express.json());
@@ -17,7 +19,7 @@ app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/products", productRoutes);
 app.use("/chats", chatsRoutes);
-
+app.use("/payments", paymentsRoutes);
 
 const server = createServer(app);
 

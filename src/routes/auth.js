@@ -160,11 +160,12 @@ router.post("/refresh",async(req,res)=>{
 
 router.post("/logout",async(req,res)=>{
   const {refreshToken}=req.body;
-
-  if(!refreshToken)return res.status(400).json({error:"Refresh token requerido"});
+  console.log(refreshToken)
+  const cleanRefreshToken = refreshToken.replace(/[\s\r\n]+/g, "");
+  if(!cleanRefreshToken)return res.status(400).json({error:"Refresh token requerido"});
     try{
         const storedToken=await retryPrisma(()=>prisma.refreshToken.findUnique({
-          where:{token:refreshToken}
+          where:{token:cleanRefreshToken}
         })); 
   if (!storedToken)
         return res.status(404).json({ error: "Token no encontrado" });
