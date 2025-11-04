@@ -37,6 +37,10 @@ model User{
   chatsAsUser2 Chat[] @relation("ChatUser2")
   messagesSent Message[] @relation("MessageSender") 
   wallet Wallet? 
+
+
+    offersMade     Offer[] @relation("OffersMade")
+  offersReceived Offer[] @relation("OffersReceived")
 }
 
 
@@ -83,6 +87,8 @@ model Product{
   ubicacion String?
   visibilidad Boolean @default(true)
   chats Chat[] 
+   offersAsRequested Offer[]       @relation("ProductRequestedRelation")
+  offersInOffers    OfferProduct[]
 }
 
 model Categoria{
@@ -155,6 +161,10 @@ model Message {
   @@index([createdAt]) 
 }
 
+//---------------------------------------
+//PAGOS
+//---------------------------------------
+
 
 model Wallet {
   id             Int      @id @default(autoincrement())
@@ -171,7 +181,60 @@ model Transaction {
   productId Int
   amount    Int
   currency  String
-  status    String   // "pending", "paid", "released"
+  status    String  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+
+//---------------------------------------
+// OFERTAS
+//---------------------------------------
+
+
+enum OfferType {
+  PRODUCT   
+  MONEY    
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+
+model Offer {
+  id                 Int          @id @default(autoincrement())
+  offererId          Int         
+  receiverId         Int         
+  productRequestedId Int       
+  type               OfferType    @default(PRODUCT) 
+  status             OfferStatus  @default(PENDING)
+  monetaryValue      Float?       
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  offerer   User     @relation("OffersMade", fields: [offererId], references: [id])
+  receiver  User     @relation("OffersReceived", fields: [receiverId], references: [id])
+  productRequested Product @relation("ProductRequestedRelation", fields: [productRequestedId], references: [id])
+
+
+  offeredProducts OfferProduct[]
+
+  @@index([offererId])
+  @@index([receiverId])
+  @@index([productRequestedId])
+}
+
+model OfferProduct {
+  id        Int     @id @default(autoincrement())
+  offerId   Int
+  productId Int
+
+  offer     Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([offerId, productId])
 }

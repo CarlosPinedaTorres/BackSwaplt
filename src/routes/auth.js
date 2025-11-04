@@ -90,48 +90,62 @@ if(existingToken){
 
 });
 
-router.post("/refresh",async(req,res)=>{
-  const {refreshToken}=req.body;
-  if(!refreshToken) return res.status(400)-json({error:"Refresh Token requerido"});
+router.post("/refresh", async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
 
-  try{
-    const storedToken= await retryPrisma(()=>prisma.refreshToken.findUnique({
-      where:{token:refreshToken},
-      include:{user:true},
+    if (!refreshToken) {
+      return res.status(400).json({ error: "Refresh Token requerido" });
+    }
 
-    }));
-    
-    if(!storedToken)return res.status(401).json({error:"Refresh token no encontrado en la base de datos"})
-    
-      if(new Date()>storedToken.expiredAT){
-        await prisma.refreshToken.delete({where:{id:storedToken.id}});
-        return res.status(401).json({error:"Refresh token caducado"});
+    // console.log(refreshToken)
+  const token = refreshToken
+  .toString()
+  .normalize("NFKC") 
+  .trim()
+  .replace(/[\s\r\n\u200B-\u200D\uFEFF]+/g, "");
+// console.log(token,"con trim refresh")
+ 
+    const storedToken = await retryPrisma(() =>
+      prisma.refreshToken.findUnique({
+        where: { token },
+        include: { user: true },
+      })
+    );
 
-      }
+    if (!storedToken) {
+      return res.status(401).json({ error: "Refresh token no encontrado" });
+    }
 
-      let payload;
 
-      try{
-        payload=jwt.verify(refreshToken,REFRESH_SECRET);
+    if (new Date() > storedToken.expiredAT) {
+      await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+      return res.status(401).json({ error: "Refresh token caducado" });
+    }
 
-      }catch(err){
-          return res.status(401).json({error:"Firma del token invalida"});
-      }
 
-      const accessToken=jwt.sign(
-        {userId:storedToken.user.id},
-        JWT_SECRET,
-        {expiresIn:"15M"}
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.REFRESH_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: "Firma del token inválida" });
+    }
 
-      );
 
-         const newRefreshToken = jwt.sign(
+    const accessToken = jwt.sign(
+      { userId: storedToken.user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const newRefreshToken = jwt.sign(
       { userId: storedToken.user.id },
       process.env.REFRESH_SECRET,
       { expiresIn: "30d" }
     );
 
- await prisma.refreshToken.update({
+ 
+    await prisma.refreshToken.update({
       where: { id: storedToken.id },
       data: {
         token: newRefreshToken,
@@ -139,29 +153,30 @@ router.post("/refresh",async(req,res)=>{
       },
     });
 
-      res.json({
-        accessToken,
-        newRefreshToken,
-        user:{
-          id:storedToken.user.id,
-          nombre:storedToken.user.nombre,
-          email:storedToken.user.email,
-        },
-      });
 
-
-
-  }catch(err){
-        console.log(err);
-        res.status(500).json({error:"Error interno del servidor"});
-
+    res.json({
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: {
+        id: storedToken.user.id,
+        nombre: storedToken.user.nombre,
+        email: storedToken.user.email,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
-})
+});
 
 router.post("/logout",async(req,res)=>{
   const {refreshToken}=req.body;
-  console.log(refreshToken)
-  const cleanRefreshToken = refreshToken.replace(/[\s\r\n]+/g, "");
+  // console.log(refreshToken)
+  const cleanRefreshToken = refreshToken
+  .toString()
+  .normalize("NFKC") 
+  .trim()
+  .replace(/[\s\r\n\u200B-\u200D\uFEFF]+/g, ""); 
   if(!cleanRefreshToken)return res.status(400).json({error:"Refresh token requerido"});
     try{
         const storedToken=await retryPrisma(()=>prisma.refreshToken.findUnique({
