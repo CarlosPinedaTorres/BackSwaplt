@@ -14,135 +14,129 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 //---------------------------------------
 //MODELOS DE USUARIOS
 //---------------------------------------
 
+model User {
+  id              Int            @id @default(autoincrement())
+  nombre          String
+  apellidos       String
+  fechaNacimiento DateTime
+  edad            Int
+  ciudad          String
+  email           String         @unique
+  password        String
+  fotoPerfil      String?
+  productos       Product[]
+  refreshTokens   RefreshToken[]
+  createdAt       DateTime       @default(now())
+  chatsAsUser1    Chat[]         @relation("ChatUser1")
+  chatsAsUser2    Chat[]         @relation("ChatUser2")
+  messagesSent    Message[]      @relation("MessageSender")
+  wallet          Wallet?
 
-model User{
-  id Int @id @default(autoincrement())
-  nombre String
-  apellidos String
-  fechaNacimiento DateTime 
-  edad Int
-  ciudad String
-  email String @unique
-  password String
-  fotoPerfil String?
-  productos Product[]
-  refreshTokens RefreshToken[] 
-  createdAt DateTime @default(now())
-  chatsAsUser1 Chat[] @relation("ChatUser1")
-  chatsAsUser2 Chat[] @relation("ChatUser2")
-  messagesSent Message[] @relation("MessageSender") 
-  wallet Wallet? 
-
-
-    offersMade     Offer[] @relation("OffersMade")
+  offersMade     Offer[] @relation("OffersMade")
   offersReceived Offer[] @relation("OffersReceived")
-}
 
+  transactionsAsBuyer  Transaction[] @relation("BuyerTransactions")
+  transactionsAsSeller Transaction[] @relation("SellerTransactions")
+}
 
 //---------------------------------------
 //MODELOS DE REFRESH TOKENS 
 //---------------------------------------
 
-
-model RefreshToken{
-  id Int @id @default(autoincrement())
-  token String @unique
-  userId Int
-  user User @relation(fields: [userId],references: [id])
+model RefreshToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
   deviceInfo String
-  createdAT DateTime @default(now())
-  expiredAT DateTime 
-
+  createdAT  DateTime @default(now())
+  expiredAT  DateTime
 }
-
 
 //---------------------------------------
 //MODELOS DE PRODUCTOS
 //---------------------------------------
 
-
-
-model Product{
-  id Int @id @default(autoincrement())
-  nombre String
-  descripcion String
-  precio Float?
-  fotos Foto[]
-  categoriaId Int
-  categoria Categoria @relation(fields:[categoriaId],references: [id])
-  tipoId Int
-  tipo Tipo @relation(fields: [tipoId],references: [id])
-  estadoId Int
-  estado Estado @relation(fields: [estadoId],references: [id])
-  disponibilidad Boolean @default(true)
-  fechaCreacion DateTime @default(now())
-  fechaActualizacion DateTime @updatedAt
-  userId Int
-  usuario User @relation(fields: [userId],references: [id])
-  ubicacion String?
-  visibilidad Boolean @default(true)
-  chats Chat[] 
-   offersAsRequested Offer[]       @relation("ProductRequestedRelation")
-  offersInOffers    OfferProduct[]
+model Product {
+  id                 Int            @id @default(autoincrement())
+  nombre             String
+  descripcion        String
+  precio             Float?
+  fotos              Foto[]
+  categoriaId        Int
+  categoria          Categoria      @relation(fields: [categoriaId], references: [id])
+  tipoId             Int
+  tipo               Tipo           @relation(fields: [tipoId], references: [id])
+  estadoId           Int
+  estado             Estado         @relation(fields: [estadoId], references: [id])
+  disponibilidad     Boolean        @default(true)
+  fechaCreacion      DateTime       @default(now())
+  fechaActualizacion DateTime       @updatedAt
+  userId             Int
+  usuario            User           @relation(fields: [userId], references: [id])
+  ubicacion          String?
+  visibilidad        Boolean        @default(true)
+  chats              Chat[]
+  offersAsRequested  Offer[]        @relation("ProductRequestedRelation")
+  offersInOffers     OfferProduct[]
+  transactions       Transaction[]
 }
 
-model Categoria{
-  id Int   @id @default(autoincrement())
-  nombre String @unique
+model Categoria {
+  id        Int       @id @default(autoincrement())
+  nombre    String    @unique
   productos Product[]
 }
 
 model Tipo {
-  id       Int        @id @default(autoincrement())
-  nombre   String     @unique 
+  id        Int       @id @default(autoincrement())
+  nombre    String    @unique
   productos Product[]
 }
 
 model Estado {
-  id       Int        @id @default(autoincrement())
-  nombre   String     @unique 
+  id        Int       @id @default(autoincrement())
+  nombre    String    @unique
   productos Product[]
 }
 
-model Foto{
-  id Int @id @default(autoincrement())
-  url String
+model Foto {
+  id         Int     @id @default(autoincrement())
+  url        String
   productoId Int
-  producto Product @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  producto   Product @relation(fields: [productoId], references: [id], onDelete: Cascade)
 }
 
 //---------------------------------------
 //CHATS
 //---------------------------------------
 
-
 model Chat {
-  id        Int  @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   user1Id   Int
   user2Id   Int
   productId Int
 
-  lastMessageId Int?      @unique 
+  lastMessageId Int?     @unique
   lastMessage   Message? @relation("LastMessageRelation", fields: [lastMessageId], references: [id])
 
-  messages      Message[] @relation("ChatMessages")
-  createdAt DateTime   @default(now())
+  messages  Message[] @relation("ChatMessages")
+  createdAt DateTime  @default(now())
 
-  updatedAt  DateTime   @updatedAt  
+  updatedAt DateTime @updatedAt
 
-  user1 User @relation("ChatUser1", fields: [user1Id], references: [id])
-  user2 User @relation("ChatUser2", fields: [user2Id], references: [id])
-  product Product @relation(fields: [productId], references: [id], onDelete:Cascade)
+  user1   User    @relation("ChatUser1", fields: [user1Id], references: [id])
+  user2   User    @relation("ChatUser2", fields: [user2Id], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   @@unique([user1Id, user2Id, productId])
-
-  @@index([user1Id]) 
-  @@index([user2Id]) 
-  @@index([updatedAt]) 
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([updatedAt])
 }
 
 model Message {
@@ -152,26 +146,25 @@ model Message {
   content   String
   createdAt DateTime @default(now())
 
-  chat      Chat     @relation("ChatMessages", fields: [chatId], references: [id] ,onDelete: Cascade)
-  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
+  chat   Chat @relation("ChatMessages", fields: [chatId], references: [id], onDelete: Cascade)
+  sender User @relation("MessageSender", fields: [senderId], references: [id])
 
   chatAsLastMessage Chat? @relation("LastMessageRelation")
 
-  @@index([chatId]) 
-  @@index([createdAt]) 
+  @@index([chatId])
+  @@index([createdAt])
 }
 
 //---------------------------------------
 //PAGOS
 //---------------------------------------
 
-
 model Wallet {
-  id             Int      @id @default(autoincrement())
-  userId         Int      @unique
-  balance        Float    @default(0)
-  pendingBalance Float    @default(0)
-  user           User     @relation(fields: [userId], references: [id])
+  id             Int   @id @default(autoincrement())
+  userId         Int   @unique
+  balance        Float @default(0)
+  pendingBalance Float @default(0)
+  user           User  @relation(fields: [userId], references: [id])
 }
 
 model Transaction {
@@ -181,20 +174,26 @@ model Transaction {
   productId Int
   amount    Int
   currency  String
-  status    String  
+  status    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
 
+  buyer   User    @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  seller  User    @relation("SellerTransactions", fields: [sellerId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([productId])
+}
 
 //---------------------------------------
 // OFERTAS
 //---------------------------------------
 
-
 enum OfferType {
-  PRODUCT   
-  MONEY    
+  PRODUCT
+  MONEY
 }
 
 enum OfferStatus {
@@ -204,22 +203,20 @@ enum OfferStatus {
   CANCELLED
 }
 
-
 model Offer {
-  id                 Int          @id @default(autoincrement())
-  offererId          Int         
-  receiverId         Int         
-  productRequestedId Int       
-  type               OfferType    @default(PRODUCT) 
-  status             OfferStatus  @default(PENDING)
-  monetaryValue      Float?       
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id                 Int         @id @default(autoincrement())
+  offererId          Int
+  receiverId         Int
+  productRequestedId Int
+  type               OfferType   @default(PRODUCT)
+  status             OfferStatus @default(PENDING)
+  monetaryValue      Float?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
-  offerer   User     @relation("OffersMade", fields: [offererId], references: [id])
-  receiver  User     @relation("OffersReceived", fields: [receiverId], references: [id])
+  offerer          User    @relation("OffersMade", fields: [offererId], references: [id])
+  receiver         User    @relation("OffersReceived", fields: [receiverId], references: [id])
   productRequested Product @relation("ProductRequestedRelation", fields: [productRequestedId], references: [id])
-
 
   offeredProducts OfferProduct[]
 
@@ -229,12 +226,12 @@ model Offer {
 }
 
 model OfferProduct {
-  id        Int     @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   offerId   Int
   productId Int
 
-  offer     Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id])
+  offer   Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
 
   @@unique([offerId, productId])
 }
