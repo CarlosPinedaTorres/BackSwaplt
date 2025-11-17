@@ -36,11 +36,8 @@ model User {
   messagesSent    Message[]      @relation("MessageSender")
   wallet          Wallet?
 
-  offersMade     Offer[] @relation("OffersMade")
-  offersReceived Offer[] @relation("OffersReceived")
-
-  transactionsAsBuyer  Transaction[] @relation("BuyerTransactions")
-  transactionsAsSeller Transaction[] @relation("SellerTransactions")
+  operationsRequested Operation[] @relation("OperationsRequested")
+  operationsReceived  Operation[] @relation("OperationsReceived")
 }
 
 //---------------------------------------
@@ -62,28 +59,28 @@ model RefreshToken {
 //---------------------------------------
 
 model Product {
-  id                 Int            @id @default(autoincrement())
+  id                 Int         @id @default(autoincrement())
   nombre             String
   descripcion        String
   precio             Float?
   fotos              Foto[]
   categoriaId        Int
-  categoria          Categoria      @relation(fields: [categoriaId], references: [id])
+  categoria          Categoria   @relation(fields: [categoriaId], references: [id])
   tipoId             Int
-  tipo               Tipo           @relation(fields: [tipoId], references: [id])
+  tipo               Tipo        @relation(fields: [tipoId], references: [id])
   estadoId           Int
-  estado             Estado         @relation(fields: [estadoId], references: [id])
-  disponibilidad     Boolean        @default(true)
-  fechaCreacion      DateTime       @default(now())
-  fechaActualizacion DateTime       @updatedAt
+  estado             Estado      @relation(fields: [estadoId], references: [id])
+  disponibilidad     Boolean     @default(true)
+  fechaCreacion      DateTime    @default(now())
+  fechaActualizacion DateTime    @updatedAt
   userId             Int
-  usuario            User           @relation(fields: [userId], references: [id])
+  usuario            User        @relation(fields: [userId], references: [id])
   ubicacion          String?
-  visibilidad        Boolean        @default(true)
+  visibilidad        Boolean     @default(true)
   chats              Chat[]
-  offersAsRequested  Offer[]        @relation("ProductRequestedRelation")
-  offersInOffers     OfferProduct[]
-  transactions       Transaction[]
+  operations         Operation[] @relation("ProductOperations")
+
+  operationProducts OperationProduct[]
 }
 
 model Categoria {
@@ -167,71 +164,57 @@ model Wallet {
   user           User  @relation(fields: [userId], references: [id])
 }
 
-model Transaction {
-  id        Int      @id @default(autoincrement())
-  buyerId   Int
-  sellerId  Int
-  productId Int
-  amount    Int
-  currency  String
-  status    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  buyer   User    @relation("BuyerTransactions", fields: [buyerId], references: [id])
-  seller  User    @relation("SellerTransactions", fields: [sellerId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-
-  @@index([buyerId])
-  @@index([sellerId])
-  @@index([productId])
-}
-
 //---------------------------------------
 // OFERTAS
 //---------------------------------------
 
-enum OfferType {
-  PRODUCT
-  MONEY
+model Operation {
+  id                    Int             @id @default(autoincrement())
+  requesterId           Int 
+  receiverId            Int 
+  mainProductId         Int 
+  type                  OperationType
+  moneyOffered          Float? 
+  isDirectPurchase      Boolean         @default(false)
+  status                OperationStatus @default(PENDING)
+  stripePaymentIntentId String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  requester       User               @relation("OperationsRequested", fields: [requesterId], references: [id])
+  receiver        User               @relation("OperationsReceived", fields: [receiverId], references: [id])
+  mainProduct     Product            @relation("ProductOperations", fields: [mainProductId], references: [id])
+  offeredProducts OperationProduct[]
+
+  @@index([requesterId])
+  @@index([receiverId])
+  @@index([mainProductId])
+  @@index([status])
+  @@index([type])
 }
 
-enum OfferStatus {
+model OperationProduct {
+  id          Int @id @default(autoincrement())
+  operationId Int
+  productId   Int
+
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@unique([operationId, productId])
+}
+
+enum OperationType {
+  SALE 
+  TRADE 
+}
+
+enum OperationStatus {
   PENDING
   ACCEPTED
+  PAYMENT_PENDING
+  PAID
+  COMPLETED
   REJECTED
   CANCELLED
-}
-
-model Offer {
-  id                 Int         @id @default(autoincrement())
-  offererId          Int
-  receiverId         Int
-  productRequestedId Int
-  type               OfferType   @default(PRODUCT)
-  status             OfferStatus @default(PENDING)
-  monetaryValue      Float?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-
-  offerer          User    @relation("OffersMade", fields: [offererId], references: [id])
-  receiver         User    @relation("OffersReceived", fields: [receiverId], references: [id])
-  productRequested Product @relation("ProductRequestedRelation", fields: [productRequestedId], references: [id])
-
-  offeredProducts OfferProduct[]
-
-  @@index([offererId])
-  @@index([receiverId])
-  @@index([productRequestedId])
-}
-
-model OfferProduct {
-  id        Int @id @default(autoincrement())
-  offerId   Int
-  productId Int
-
-  offer   Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
-
-  @@unique([offerId, productId])
 }
