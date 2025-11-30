@@ -5,6 +5,46 @@ import { retryPrisma } from "../utils/retryPrisma.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+export const getOperationById = async (req, res) => {
+  try {
+    const operationId = Number(req.params.operationId);
+
+    if (isNaN(operationId)) {
+      return res.status(400).json({ error: "ID de operación inválido" });
+    }
+    const operation = await retryPrisma(() =>
+      prisma.operation.findUnique({
+        where: { id: operationId },
+        include: {
+          mainProduct: true,
+          offeredProducts: {
+            include: {
+              product: true,
+            },
+          },
+          requester: {
+            select: { id: true, nombre: true },
+          },
+          receiver: {
+            select: { id: true, nombre: true },
+          },
+        },
+      })
+    );
+
+    if (!operation) {
+      return res.status(404).json({ error: "Operación no encontrada" });
+    }
+
+    res.json(operation);
+  } catch (error) {
+    console.error("Error obteniendo operación:", error);
+    res.status(500).json({ error: "No se pudo obtener la operación" });
+  }
+};
+
+
+
 export const getUserOperations = async (req, res) => {
   try {
     const userId = req.userId;
@@ -31,7 +71,7 @@ export const getUserOperations = async (req, res) => {
             select: { id: true, nombre: true }
           }
         },
-           orderBy: { updatedAt: "desc" } 
+        orderBy: { updatedAt: "desc" }
       })
     );
 
@@ -41,6 +81,97 @@ export const getUserOperations = async (req, res) => {
     res.status(500).json({ error: "No se pudieron obtener las operaciones" });
   }
 };
+
+
+export const rejectOperation = async (req, res) => {
+  try {
+    const { operationId } = req.body;
+    const userId = req.userId;
+
+    const operation = await prisma.operation.findUnique({
+      where: { id: operationId }
+    });
+
+    if (!operation)
+      return res.status(404).json({ error: "Operación no encontrada" });
+
+    if (operation.receiverId !== userId) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+
+    const updated = await prisma.operation.update({
+      where: { id: operationId },
+      data: { status: "REJECTED" },
+      include: {
+        mainProduct: true,
+        offeredProducts: {
+          include: { product: true }
+        },
+        requester: {
+          select: { id: true, nombre: true }
+        },
+        receiver: {
+          select: { id: true, nombre: true }
+        }
+      }
+    });
+
+    res.json(updated);
+
+  } catch (error) {
+    console.error("Error rechazando operación:", error);
+    res.status(500).json({ error: "No se pudo rechazar la operación" });
+  }
+};
+
+export const acceptOperation = async (req, res) => {
+  try {
+    const { operationId } = req.body;
+    const userId = req.userId;
+    let status = "";
+    const operation = await prisma.operation.findUnique({
+      where: { id: operationId }
+    });
+
+
+    if (!operation)
+      return res.status(404).json({ error: "Operación no encontrada" });
+
+    if (operation.receiverId !== userId) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+    if (operation.type === "TRADE") {
+      status = "COMPLETED"
+    } else {
+      status = "PAYMENT_PENDING"
+    }
+
+
+    const updated = await prisma.operation.update({
+      where: { id: operationId },
+      data: { status: status },
+      include: {
+        mainProduct: true,
+        offeredProducts: {
+          include: { product: true }
+        },
+        requester: {
+          select: { id: true, nombre: true }
+        },
+        receiver: {
+          select: { id: true, nombre: true }
+        }
+      }
+    });
+
+    res.json(updated);
+
+  } catch (error) {
+    console.error("Error aceptando operación:", error);
+    res.status(500).json({ error: "No se pudo aceptar la operación" });
+  }
+};
+
 
 
 export const createOfferOperation = async (req, res) => {
@@ -85,7 +216,7 @@ export const createOfferOperation = async (req, res) => {
       })
     );
 
-   
+
     if (operationType === "TRADE" && offeredProductIds?.length > 0) {
       await retryPrisma(() =>
         prisma.operationProduct.createMany({
@@ -200,7 +331,12 @@ export const createOperationPaymentIntent = async (req, res) => {
         IdOperacion: operation.id.toString(),
         IdProducto: operation.mainProduct.id.toString(),
         Nombre_Producto: operation.mainProduct.nombre,
-        Precio_Producto: operation.mainProduct.precio?.toString() || "0",
+        Precio_Producto: (
+          operation.isDirectPurchase
+            ? operation.mainProduct.precio
+            : operation.moneyOffered
+        ).toString(),
+
         IdVendedor: operation.receiverId.toString(),
         IdComprador: operation.requesterId.toString(),
       },
@@ -254,7 +390,7 @@ export const confirmOperationPayment = async (req, res) => {
         .json({ error: "Producto principal no encontrado en la operación" });
     }
 
-   
+
     await retryPrisma(() =>
       prisma.operation.update({
         where: { id: operationId },
@@ -262,7 +398,7 @@ export const confirmOperationPayment = async (req, res) => {
       })
     );
 
-   
+
     await retryPrisma(() =>
       prisma.wallet.update({
         where: { userId: operation.requesterId },

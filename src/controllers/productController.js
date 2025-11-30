@@ -2,7 +2,6 @@ import prisma from "../prisma.js";
 import { retryPrisma } from "../utils/retryPrisma.js";
 
 
-
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -15,19 +14,18 @@ export const updateProduct = async (req, res) => {
       tipoId,
       estadoId,
       ubicacion,
-      disponibilidad
+      disponibilidad,
+      fotos,
     } = req.body;
-
 
     if (!id || isNaN(id)) {
       return res.status(400).json({ error: "ID de producto inválido o faltante" });
     }
-
-
+    // console.log(fotos)
     const productoExistente = await retryPrisma(() =>
       prisma.product.findUnique({
         where: { id: parseInt(id) },
-        select: { id: true, userId: true }
+        select: { id: true, userId: true, fotos: true },
       })
     );
 
@@ -35,13 +33,12 @@ export const updateProduct = async (req, res) => {
       return res.status(404).json({ error: "Producto no encontrado" });
     }
 
-
     if (userId && productoExistente.userId !== userId) {
       return res.status(403).json({ error: "No tienes permiso para editar este producto" });
     }
 
-
     const dataToUpdate = {};
+
     if (nombre) dataToUpdate.nombre = nombre;
     if (descripcion) dataToUpdate.descripcion = descripcion;
     if (precio !== undefined) dataToUpdate.precio = precio;
@@ -52,6 +49,28 @@ export const updateProduct = async (req, res) => {
     if (disponibilidad !== undefined) dataToUpdate.disponibilidad = disponibilidad;
 
 
+    if (fotos && Array.isArray(fotos)) {
+      const fotosToCreate = fotos.filter(f => !f.id && f.url);
+      const fotosToUpdate = fotos.filter(f => f.id && f.url);
+      // console.log(fotosToCreate,"aqui")
+   
+      if (fotosToCreate.length > 0 || fotosToUpdate.length > 0) {
+        dataToUpdate.fotos = {};
+
+        if (fotosToCreate.length > 0) {
+          dataToUpdate.fotos.create = fotosToCreate.map(f => ({ url: f.url }));
+        }
+
+        if (fotosToUpdate.length > 0) {
+          dataToUpdate.fotos.update = fotosToUpdate.map(f => ({
+            where: { id: f.id },
+            data: { url: f.url },
+          }));
+        }
+      }
+    }
+
+
     if (Object.keys(dataToUpdate).length === 0) {
       return res.status(400).json({ error: "No se enviaron campos para actualizar" });
     }
@@ -60,6 +79,7 @@ export const updateProduct = async (req, res) => {
       prisma.product.update({
         where: { id: parseInt(id) },
         data: dataToUpdate,
+        include: { fotos: true },
       })
     );
 
@@ -69,11 +89,9 @@ export const updateProduct = async (req, res) => {
     });
   } catch (err) {
     console.error("Error actualizando producto:", err);
-
     if (err.code === "P2025") {
       return res.status(404).json({ error: "Producto no encontrado" });
     }
-
     res.status(500).json({ error: "Error actualizando producto" });
   }
 };
@@ -82,6 +100,7 @@ export const updateProduct = async (req, res) => {
 
 export const getAllOptions = async (req, res) => {
   try {
+
     const categorias = await retryPrisma(() => prisma.categoria.findMany());
     const tipos = await retryPrisma(() => prisma.tipo.findMany());
     const estados = await retryPrisma(() => prisma.estado.findMany());
@@ -131,7 +150,7 @@ export const createProduct = async (req, res) => {
 
 
 
-    const { nombre, descripcion, precio, categoriaId, tipoId, estadoId, userId, ubicacion } = req.body;
+    const { nombre, descripcion, precio, categoriaId, tipoId, estadoId, userId, ubicacion, fotos = [] } = req.body;
 
     const nuevoProducto = await retryPrisma(() => prisma.product.create({
       data: {
@@ -143,9 +162,17 @@ export const createProduct = async (req, res) => {
         estadoId,
         userId,
         ubicacion,
-
+        fotos: {
+          createMany: {
+            data: fotos.map(url => ({ url }))
+          }
+        }
       },
-    }));
+      include: {
+        fotos: true
+      }
+    })
+    );
 
     res.status(201).json(nuevoProducto);
   } catch (err) {
@@ -205,7 +232,9 @@ export const getUserProducts = async (req, res) => {
         usuario: { select: { id: true, nombre: true } },
         ubicacion: true,
         disponibilidad: true,
-
+        fotos: {
+          select: { id: true, url: true }
+        }
       },
       orderBy: { fechaCreacion: "desc" }
     });
@@ -238,6 +267,9 @@ export const getAllProducts = async (req, res) => {
         ubicacion: true,
         disponibilidad: true,
         userId: true,
+        fotos: {
+          select: { url: true }
+        }
       },
       orderBy: { fechaCreacion: "desc" }
     })
