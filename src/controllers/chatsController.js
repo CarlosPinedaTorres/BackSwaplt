@@ -2,6 +2,38 @@ import prisma from "../prisma.js";
 import { retryPrisma } from "../utils/retryPrisma.js";
 
 
+
+
+
+export const deleteChat = async (req, res) => {
+  const { chatId } = req.params;
+
+  try {
+
+    const chat = await retryPrisma(() =>
+      prisma.chat.findUnique({
+        where: { id: parseInt(chatId) },
+      })
+    );
+
+    if (!chat) {
+      return res.status(404).json({ error: "Chat no encontrado" });
+    }
+
+
+    await retryPrisma(() =>
+      prisma.chat.delete({
+        where: { id: parseInt(chatId) },
+      })
+    );
+
+    res.json({ message: "Chat eliminado correctamente" });
+  } catch (err) {
+    console.error("Error eliminando chat:", err);
+    res.status(500).json({ error: "Error eliminando chat" });
+  }
+};
+
 export const createOrGetChat=async(req,res)=>{
     const {user1Id,user2Id,productId}=req.body;
     try{

@@ -2,6 +2,9 @@ import prisma from "../prisma.js";
 import { retryPrisma } from "../utils/retryPrisma.js";
 
 
+
+
+
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -232,6 +235,7 @@ export const getUserProducts = async (req, res) => {
         usuario: { select: { id: true, nombre: true } },
         ubicacion: true,
         disponibilidad: true,
+        visibilidad:true,
         fotos: {
           select: { id: true, url: true }
         }
@@ -266,6 +270,7 @@ export const getAllProducts = async (req, res) => {
         usuario: { select: { id: true, nombre: true } },
         ubicacion: true,
         disponibilidad: true,
+        visibilidad:true,
         userId: true,
         fotos: {
           select: { url: true }

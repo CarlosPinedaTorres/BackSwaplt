@@ -170,20 +170,21 @@ model Wallet {
 
 model Operation {
   id                    Int             @id @default(autoincrement())
-  requesterId           Int 
-  receiverId            Int 
-  mainProductId         Int 
+  requesterId           Int
+  receiverId            Int
+  mainProductId         Int
   type                  OperationType
-  moneyOffered          Float? 
+  moneyOffered          Float?
   isDirectPurchase      Boolean         @default(false)
   status                OperationStatus @default(PENDING)
   stripePaymentIntentId String?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
-  requester       User               @relation("OperationsRequested", fields: [requesterId], references: [id])
-  receiver        User               @relation("OperationsReceived", fields: [receiverId], references: [id])
-  mainProduct     Product            @relation("ProductOperations", fields: [mainProductId], references: [id])
+  requester   User    @relation("OperationsRequested", fields: [requesterId], references: [id])
+  receiver    User    @relation("OperationsReceived", fields: [receiverId], references: [id])
+  mainProduct Product @relation("ProductOperations", fields: [mainProductId], references: [id], onDelete: Cascade)
+
   offeredProducts OperationProduct[]
 
   @@index([requesterId])
@@ -199,14 +200,14 @@ model OperationProduct {
   productId   Int
 
   operation Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
-  product   Product   @relation(fields: [productId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([operationId, productId])
 }
 
 enum OperationType {
-  SALE 
-  TRADE 
+  SALE
+  TRADE
 }
 
 enum OperationStatus {

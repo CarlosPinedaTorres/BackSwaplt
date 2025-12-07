@@ -130,7 +130,10 @@ export const acceptOperation = async (req, res) => {
     const userId = req.userId;
     let status = "";
     const operation = await prisma.operation.findUnique({
-      where: { id: operationId }
+      where: { id: operationId },
+      include: {
+        offeredProducts: true,
+      }
     });
 
 
@@ -142,11 +145,39 @@ export const acceptOperation = async (req, res) => {
     }
     if (operation.type === "TRADE") {
       status = "COMPLETED"
+      await prisma.product.update({
+        where: { id: operation.mainProductId },
+        data: { visibilidad: false }
+      });
+      if (operation.offeredProducts?.length > 0) {
+        const offeredProductIds = operation.offeredProducts.map(op => op.productId);
+        await prisma.product.updateMany({
+          where: { id: { in: offeredProductIds } },
+          data: { visibilidad: false },
+        });
+      }
+
     } else {
       status = "PAYMENT_PENDING"
+      await prisma.product.update({
+        where: { id: operation.mainProductId },
+        data: { visibilidad: false },
+      });
     }
 
-
+    await prisma.operation.deleteMany({
+      where: {
+        id: { not: operationId },
+        OR: [
+          { mainProductId: { in: allProductIds } },
+          {
+            offeredProducts: {
+              some: { productId: { in: allProductIds } },
+            },
+          },
+        ],
+      },
+    });
     const updated = await prisma.operation.update({
       where: { id: operationId },
       data: { status: status },
@@ -172,6 +203,49 @@ export const acceptOperation = async (req, res) => {
   }
 };
 
+
+
+
+export const deleteOfferOperation = async (req, res) => {
+  try {
+
+    const operationId = Number(req.params.id);
+
+    const userId = req.userId;
+
+    const operation = await retryPrisma(() =>
+      prisma.operation.findUnique({
+        where: { id: operationId },
+        select: { requesterId: true, receiverId: true, status: true },
+      })
+    );
+
+    if (!operation) {
+      return res.status(404).json({ error: "La oferta no existe" });
+    }
+
+    if (operation.requesterId !== userId && operation.receiverId !== userId) {
+      return res.status(403).json({ error: "No puedes eliminar esta oferta" });
+    }
+
+    if (["COMPLETED", "PAID"].includes(operation.status)) {
+      return res.status(400).json({ error: "No puedes eliminar una oferta ya completada o pagada" });
+    }
+
+
+    await retryPrisma(() =>
+      prisma.operation.delete({
+        where: { id: operationId },
+      })
+    );
+
+    res.json({ message: "Oferta eliminada correctamente" });
+
+  } catch (error) {
+    console.error("Error eliminando oferta:", error);
+    res.status(500).json({ error: "Error eliminando oferta" });
+  }
+};
 
 
 export const createOfferOperation = async (req, res) => {
@@ -397,6 +471,11 @@ export const confirmOperationPayment = async (req, res) => {
         data: { status: "PAID" },
       })
     );
+    await prisma.product.update({
+      where: { id: operation.mainProductId },
+      data: { visibilidad: false }
+    });
+
 
 
     await retryPrisma(() =>

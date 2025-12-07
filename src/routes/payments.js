@@ -1,6 +1,6 @@
 import express from "express";
 import { auth } from "../middlewares/auth.js"; 
-import {getOperationById,rejectOperation, acceptOperation,getUserOperations,getUserWallet,createDirectPurchaseOperation,createOperationPaymentIntent,confirmOperationPayment,createOfferOperation } from "../controllers/paymentsController.js";
+import {deleteOfferOperation,getOperationById,rejectOperation, acceptOperation,getUserOperations,getUserWallet,createDirectPurchaseOperation,createOperationPaymentIntent,confirmOperationPayment,createOfferOperation } from "../controllers/paymentsController.js";
 
 const router = express.Router();
 router.post("/operation/create", auth, createDirectPurchaseOperation);
@@ -15,4 +15,6 @@ router.post("/operation/reject-operation",auth,rejectOperation)
 router.get("/wallet",auth,getUserWallet)
 
 router.get("/operation/:operationId", auth, getOperationById);
+
+router.delete("/operation/:id/delete", auth, deleteOfferOperation);
 export default router;
